@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generador de Paràgrafs amb Edició</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    [data-placeholder]:empty::before {
+      content: attr(data-placeholder);
+      color: #999;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 p-4">
+  <div class="max-w-3xl mx-auto">
+    <h1 class="text-3xl font-bold mb-4">Generador de Paràgrafs amb Edició</h1>
+    
+    <!-- Input per configurar la llargada màxima -->
+    <div class="mb-4">
+      <label for="maxLength" class="block mb-1 font-semibold">Longitud màxima per paràgraf:</label>
+      <input id="maxLength" type="number" value="240" min="1" class="border p-2 w-full">
+    </div>
+    
+    <!-- Editor de text amb suport per a salts de línia i tabuladors -->
+    <div class="mb-4">
+      <label class="block mb-1 font-semibold">Introdueix el text:</label>
+      <div 
+        id="textInput" 
+        contenteditable="true" 
+        data-placeholder="Escriu el teu text aquí..."
+        class="border p-2 w-full min-h-[150px] whitespace-pre-wrap overflow-auto"
+      ></div>
+    </div>
+    
+    <!-- Comptador de caràcters del textbox principal -->
+    <div class="mb-4">
+      <span id="textboxCharCount" class="text-gray-700">0 caràcters</span>
+    </div>
+    
+    <!-- Checkbox per afegir els tres punts al principi i al final -->
+    <div class="mb-4 flex items-center">
+      <input type="checkbox" id="ellipsisCheckbox" class="mr-2" checked>
+      <label for="ellipsisCheckbox" class="font-semibold">Afegir tres punts al principi i al final</label>
+    </div>
+    
+    <!-- Checkbox per mostrar total de paràgrafs en el número -->
+    <div class="mb-4 flex items-center">
+      <input type="checkbox" id="totalParagraphsCheckbox" class="mr-2">
+      <label for="totalParagraphsCheckbox" class="font-semibold">Mostrar total de paràgrafs en el número</label>
+    </div>
+    
+    <!-- Contenidor on es mostraran els paràgrafs generats -->
+    <div id="paragraphsContainer"></div>
+  </div>
+  
+  <!-- JavaScript (vanila, tipus module) -->
+  <script type="module">
+    // Variables globals per mantenir els paràgrafs actuals i l'estat d'edició
+    let currentParagraphs = [];
+    let editingParagraphIndex = null;
+    
+    /**
+     * Genera una llista de paràgrafs a partir del text, tenint en compte la llargada màxima i
+     * la reserva per als tres punts.
+     */
+    function generateParagraphs(text, maxLength, ellipsisEnabled) {
+      const words = text.trim().split(/(?=\S)/); // Millor split per mantenir caràcters especials
+      const paragraphs = [];
+      let i = 0;
+      let paragraphIndex = 0;
+      
+      while (i < words.length) {
+        let reserve = ellipsisEnabled ? (paragraphIndex === 0 ? 3 : 6) : 0;
+        let allowed = maxLength - reserve;
+        if (allowed < 1) allowed = 1;
+        
+        let currentParagraph = "";
+        while (i < words.length && (currentParagraph + words[i]).length <= allowed) {
+          currentParagraph += words[i];
+          i++;
+        }
+        
+        if (currentParagraph === "" && i < words.length) {
+          currentParagraph = words[i].substring(0, allowed);
+          words[i] = words[i].substring(allowed);
+        }
+        
+        paragraphs.push(currentParagraph);
+        paragraphIndex++;
+      }
+      return paragraphs;
+    }
+
+    /**
+     * Re-renderitza els paràgrafs.
+     */
+    function renderParagraphs() {
+      const textInput = document.getElementById('textInput');
+      const maxLengthInput = document.getElementById('maxLength');
+      const ellipsisCheckbox = document.getElementById('ellipsisCheckbox');
+      const totalParagraphsCheckbox = document.getElementById('totalParagraphsCheckbox');
+      const container = document.getElementById('paragraphsContainer');
+      const textboxCharCount = document.getElementById('textboxCharCount');
+      
+      const text = textInput.textContent;
+      const maxLength = parseInt(maxLengthInput.value, 10) || 240;
+      const ellipsisEnabled = ellipsisCheckbox.checked;
+      const showTotalParagraphs = totalParagraphsCheckbox.checked;
+      
+      textboxCharCount.textContent = `${text.length} caràcters`;
+      
+      if (editingParagraphIndex === null) {
+        currentParagraphs = generateParagraphs(text, maxLength, ellipsisEnabled);
+      }
+      
+      container.innerHTML = "";
+      if (!text.trim()) return;
+      
+      currentParagraphs.forEach((para, index) => {
+        const paraDiv = document.createElement('div');
+        paraDiv.className = "bg-white p-4 mb-4 border rounded shadow";
+        
+        const paraNumber = document.createElement('h2');
+        paraNumber.textContent = showTotalParagraphs ? 
+          `${index + 1} de ${currentParagraphs.length}` : 
+          `${index + 1}.`;
+        paraNumber.className = "font-bold mb-2";
+        paraDiv.appendChild(paraNumber);
+        
+        const contentDiv = document.createElement('div');
+        
+        if (editingParagraphIndex === index) {
+          const editTextarea = document.createElement('textarea');
+          editTextarea.className = "border p-2 w-full mb-2 font-mono";
+          editTextarea.value = para;
+          contentDiv.appendChild(editTextarea);
+          
+          const actionRow = document.createElement('div');
+          actionRow.className = "flex items-center space-x-2";
+          
+          const saveBtn = document.createElement('button');
+          saveBtn.textContent = "Desar";
+          saveBtn.className = "bg-green-500 text-white px-2 py-1 text-sm rounded hover:bg-green-600";
+          saveBtn.onclick = () => {
+            currentParagraphs[index] = editTextarea.value;
+            textInput.textContent = currentParagraphs.join(" "); // Ajustar segons necessitat
+            editingParagraphIndex = null;
+            renderParagraphs();
+          };
+          
+          const cancelBtn = document.createElement('button');
+          cancelBtn.textContent = "Cancel·lar";
+          cancelBtn.className = "bg-red-500 text-white px-2 py-1 text-sm rounded hover:bg-red-600";
+          cancelBtn.onclick = () => {
+            editingParagraphIndex = null;
+            renderParagraphs();
+          };
+          
+          actionRow.append(saveBtn, cancelBtn);
+          contentDiv.appendChild(actionRow);
+        } else {
+          const paraContent = document.createElement('pre');
+          paraContent.className = "whitespace-pre-wrap font-sans";
+          let displayText = para;
+          
+          if (ellipsisEnabled) {
+            displayText = (index > 0 ? "..." : "") + displayText;
+            if (index !== currentParagraphs.length - 1) displayText += "...";
+          }
+          
+          paraContent.textContent = displayText;
+          contentDiv.appendChild(paraContent);
+          
+          const actionRow = document.createElement('div');
+          actionRow.className = "flex items-center space-x-2 mt-2";
+          
+          const editBtn = document.createElement('button');
+          editBtn.textContent = "Editar";
+          editBtn.className = "bg-blue-500 text-white px-2 py-1 text-sm rounded hover:bg-blue-600";
+          editBtn.onclick = () => {
+            editingParagraphIndex = index;
+            renderParagraphs();
+          };
+          
+          const copyBtn = document.createElement('button');
+          copyBtn.textContent = "Copiar";
+          copyBtn.className = "bg-blue-500 text-white px-2 py-1 text-sm rounded hover:bg-blue-600";
+          copyBtn.onclick = () => {
+            navigator.clipboard.writeText(para);
+            copyBtn.textContent = "Copiat!";
+            setTimeout(() => copyBtn.textContent = "Copiar", 2000);
+          };
+          
+          const charCountSpan = document.createElement('span');
+          charCountSpan.textContent = `${para.length} caràcters`;
+          charCountSpan.className = "text-gray-600 text-sm";
+          
+          actionRow.append(editBtn, copyBtn, charCountSpan);
+          contentDiv.appendChild(actionRow);
+        }
+        
+        paraDiv.appendChild(contentDiv);
+        container.appendChild(paraDiv);
+      });
+    }
+
+    // Configuració del contenteditable
+    const textInput = document.getElementById('textInput');
+    
+    // Manejar tabuladors
+    textInput.addEventListener('keydown', e => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        document.execCommand('insertText', false, '\t');
+      }
+    });
+
+    // Actualitzar renderització en canvis
+    textInput.addEventListener('input', () => {
+      editingParagraphIndex = null;
+      renderParagraphs();
+    });
+
+    // Configuració inicial
+    document.getElementById('maxLength').addEventListener('input', renderParagraphs);
+    document.getElementById('ellipsisCheckbox').addEventListener('change', renderParagraphs);
+    document.getElementById('totalParagraphsCheckbox').addEventListener('change', renderParagraphs);
+    renderParagraphs();
+  </script>
+</body>
+</html>

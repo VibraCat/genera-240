@@ -6,13 +6,6 @@
   <title>Generador de Paràgrafs amb Edició</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    [data-placeholder]:empty::before {
-      content: attr(data-placeholder);
-      color: #999;
-      pointer-events: none;
-    }
-  </style>
 </head>
 <body class="bg-gray-100 p-4">
   <div class="max-w-3xl mx-auto">
@@ -24,15 +17,10 @@
       <input id="maxLength" type="number" value="240" min="1" class="border p-2 w-full">
     </div>
     
-    <!-- Editor de text amb suport per a salts de línia i tabuladors -->
+    <!-- Textbox principal per introduir el text -->
     <div class="mb-4">
-      <label class="block mb-1 font-semibold">Introdueix el text:</label>
-      <div 
-        id="textInput" 
-        contenteditable="true" 
-        data-placeholder="Escriu el teu text aquí..."
-        class="border p-2 w-full min-h-[150px] whitespace-pre-wrap overflow-auto"
-      ></div>
+      <label for="textInput" class="block mb-1 font-semibold">Introdueix el text:</label>
+      <textarea id="textInput" rows="5" class="border p-2 w-full" placeholder="Escriu el teu text aquí..."></textarea>
     </div>
     
     <!-- Comptador de caràcters del textbox principal -->
@@ -65,37 +53,59 @@
     /**
      * Genera una llista de paràgrafs a partir del text, tenint en compte la llargada màxima i
      * la reserva per als tres punts.
+     *
+     * @param {string} text - El text introduït.
+     * @param {number} maxLength - La llargada màxima total per cada paràgraf (incloent espai per als tres punts).
+     * @param {boolean} ellipsisEnabled - Indica si s'han d'afegir els tres punts.
+     * @returns {string[]} - Array amb els paràgrafs generats (sense els tres punts afegits).
      */
     function generateParagraphs(text, maxLength, ellipsisEnabled) {
-      const words = text.trim().split(/(?=\S)/); // Millor split per mantenir caràcters especials
+      const words = text.trim().split(/\s+/);
       const paragraphs = [];
       let i = 0;
       let paragraphIndex = 0;
       
       while (i < words.length) {
-        let reserve = ellipsisEnabled ? (paragraphIndex === 0 ? 3 : 6) : 0;
+        // Calcular la reserva d'espai per als tres punts
+        let reserve = 0;
+        if (ellipsisEnabled) {
+          if (paragraphIndex === 0) {
+            reserve = (i < words.length - 1) ? 3 : 0;
+          } else {
+            reserve = (i < words.length - 1) ? 6 : 3;
+          }
+        }
         let allowed = maxLength - reserve;
-        if (allowed < 1) allowed = 1;
+        if (allowed < 0) allowed = 0;
         
         let currentParagraph = "";
-        while (i < words.length && (currentParagraph + words[i]).length <= allowed) {
-          currentParagraph += words[i];
+        // Si la paraula és més llarga que l'espai permès, la posem tal com està
+        if (words[i].length > allowed && currentParagraph === "") {
+          paragraphs.push(words[i]);
           i++;
+          paragraphIndex++;
+          continue;
+        } else {
+          currentParagraph = words[i];
+          i++;
+          while (i < words.length) {
+            if (currentParagraph.length + 1 + words[i].length <= allowed) {
+              currentParagraph += " " + words[i];
+              i++;
+            } else {
+              break;
+            }
+          }
         }
-        
-        if (currentParagraph === "" && i < words.length) {
-          currentParagraph = words[i].substring(0, allowed);
-          words[i] = words[i].substring(allowed);
-        }
-        
         paragraphs.push(currentParagraph);
         paragraphIndex++;
       }
       return paragraphs;
     }
-
+    
     /**
-     * Re-renderitza els paràgrafs.
+     * Re-renderitza els paràgrafs. Si un paràgraf està en mode edició, es mostra un textarea
+     * amb botons per desar i cancel·lar en la mateixa fila. Quan es desa, s'actualitza el textbox principal.
      */
     function renderParagraphs() {
       const textInput = document.getElementById('textInput');
@@ -105,13 +115,15 @@
       const container = document.getElementById('paragraphsContainer');
       const textboxCharCount = document.getElementById('textboxCharCount');
       
-      const text = textInput.textContent;
+      const text = textInput.value;
       const maxLength = parseInt(maxLengthInput.value, 10) || 240;
       const ellipsisEnabled = ellipsisCheckbox.checked;
       const showTotalParagraphs = totalParagraphsCheckbox.checked;
       
+      // Actualitzar el comptador del textbox principal
       textboxCharCount.textContent = `${text.length} caràcters`;
       
+      // Si no hi ha cap paràgraf en mode edició, recreem els paràgrafs a partir del textbox principal
       if (editingParagraphIndex === null) {
         currentParagraphs = generateParagraphs(text, maxLength, ellipsisEnabled);
       }
@@ -123,18 +135,28 @@
         const paraDiv = document.createElement('div');
         paraDiv.className = "bg-white p-4 mb-4 border rounded shadow";
         
+        // Número de paràgraf
         const paraNumber = document.createElement('h2');
-        paraNumber.textContent = showTotalParagraphs ? 
-          `${index + 1} de ${currentParagraphs.length}` : 
-          `${index + 1}.`;
+        let numbering = "";
+        if (showTotalParagraphs) {
+          // numbering = `${index + 1} de ${currentParagraphs.length}`;
+          numbering = `${index + 1}/${currentParagraphs.length}`;
+        } else {
+          numbering = `${index + 1}.`;
+        }
+        paraNumber.textContent = numbering;
         paraNumber.className = "font-bold mb-2";
         paraDiv.appendChild(paraNumber);
         
+        // Contenidor del contingut del paràgraf
         const contentDiv = document.createElement('div');
         
         if (editingParagraphIndex === index) {
+          // Mode edició: textarea i botons "Desar" i "Cancel·lar" en la mateixa fila
           const editTextarea = document.createElement('textarea');
-          editTextarea.className = "border p-2 w-full mb-2 font-mono";
+          editTextarea.className = "border p-2 w-full mb-2";
+          // Dona-li més alçada al textarea (doble de l'alçada per defecte)
+          editTextarea.setAttribute("rows", "10");
           editTextarea.value = para;
           contentDiv.appendChild(editTextarea);
           
@@ -144,61 +166,75 @@
           const saveBtn = document.createElement('button');
           saveBtn.textContent = "Desar";
           saveBtn.className = "bg-green-500 text-white px-2 py-1 text-sm rounded hover:bg-green-600";
-          saveBtn.onclick = () => {
+          saveBtn.addEventListener('click', () => {
             currentParagraphs[index] = editTextarea.value;
-            textInput.textContent = currentParagraphs.join(" "); // Ajustar segons necessitat
+            textInput.value = currentParagraphs.join(" ");
             editingParagraphIndex = null;
             renderParagraphs();
-          };
+          });
+          actionRow.appendChild(saveBtn);
           
           const cancelBtn = document.createElement('button');
           cancelBtn.textContent = "Cancel·lar";
           cancelBtn.className = "bg-red-500 text-white px-2 py-1 text-sm rounded hover:bg-red-600";
-          cancelBtn.onclick = () => {
+          cancelBtn.addEventListener('click', () => {
             editingParagraphIndex = null;
             renderParagraphs();
-          };
+          });
+          actionRow.appendChild(cancelBtn);
           
-          actionRow.append(saveBtn, cancelBtn);
           contentDiv.appendChild(actionRow);
         } else {
-          const paraContent = document.createElement('pre');
-          paraContent.className = "whitespace-pre-wrap font-sans";
+          // Mode visualització: text i fila d'accions
+          const paraContent = document.createElement('p');
           let displayText = para;
-          
           if (ellipsisEnabled) {
-            displayText = (index > 0 ? "..." : "") + displayText;
-            if (index !== currentParagraphs.length - 1) displayText += "...";
+            if (index > 0) {
+              displayText = "..." + displayText;
+            }
+            if (index !== currentParagraphs.length - 1) {
+              displayText = displayText + "...";
+            }
           }
-          
           paraContent.textContent = displayText;
           contentDiv.appendChild(paraContent);
           
+          // Fila d'accions: botons "Editar", "Copiar" i el comptador de caràcters
           const actionRow = document.createElement('div');
           actionRow.className = "flex items-center space-x-2 mt-2";
           
           const editBtn = document.createElement('button');
           editBtn.textContent = "Editar";
           editBtn.className = "bg-blue-500 text-white px-2 py-1 text-sm rounded hover:bg-blue-600";
-          editBtn.onclick = () => {
+          editBtn.addEventListener('click', () => {
             editingParagraphIndex = index;
             renderParagraphs();
-          };
+          });
+          actionRow.appendChild(editBtn);
           
           const copyBtn = document.createElement('button');
           copyBtn.textContent = "Copiar";
           copyBtn.className = "bg-blue-500 text-white px-2 py-1 text-sm rounded hover:bg-blue-600";
-          copyBtn.onclick = () => {
-            navigator.clipboard.writeText(para);
-            copyBtn.textContent = "Copiat!";
-            setTimeout(() => copyBtn.textContent = "Copiar", 2000);
-          };
+          copyBtn.addEventListener('click', () => {
+            // Copiem el text amb la numeració i els punts afegits
+            navigator.clipboard.writeText(`${numbering} ${displayText}`)
+              .then(() => {
+                copyBtn.textContent = "Copiat!";
+                setTimeout(() => {
+                  copyBtn.textContent = "Copiar";
+                }, 2000);
+              })
+              .catch(err => {
+                console.error('Error en copiar: ', err);
+              });
+          });
+          actionRow.appendChild(copyBtn);
           
           const charCountSpan = document.createElement('span');
-          charCountSpan.textContent = `${para.length} caràcters`;
+          charCountSpan.textContent = `${currentParagraphs[index].length} caràcters`;
           charCountSpan.className = "text-gray-600 text-sm";
+          actionRow.appendChild(charCountSpan);
           
-          actionRow.append(editBtn, copyBtn, charCountSpan);
           contentDiv.appendChild(actionRow);
         }
         
@@ -206,28 +242,22 @@
         container.appendChild(paraDiv);
       });
     }
-
-    // Configuració del contenteditable
-    const textInput = document.getElementById('textInput');
     
-    // Manejar tabuladors
-    textInput.addEventListener('keydown', e => {
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        document.execCommand('insertText', false, '\t');
-      }
-    });
-
-    // Actualitzar renderització en canvis
+    // Event listeners
+    const textInput = document.getElementById('textInput');
+    const maxLengthInput = document.getElementById('maxLength');
+    const ellipsisCheckbox = document.getElementById('ellipsisCheckbox');
+    const totalParagraphsCheckbox = document.getElementById('totalParagraphsCheckbox');
+    
     textInput.addEventListener('input', () => {
       editingParagraphIndex = null;
       renderParagraphs();
     });
-
-    // Configuració inicial
-    document.getElementById('maxLength').addEventListener('input', renderParagraphs);
-    document.getElementById('ellipsisCheckbox').addEventListener('change', renderParagraphs);
-    document.getElementById('totalParagraphsCheckbox').addEventListener('change', renderParagraphs);
+    maxLengthInput.addEventListener('input', renderParagraphs);
+    ellipsisCheckbox.addEventListener('change', renderParagraphs);
+    totalParagraphsCheckbox.addEventListener('change', renderParagraphs);
+    
+    // Renderització inicial
     renderParagraphs();
   </script>
 </body>

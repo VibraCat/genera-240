@@ -9,7 +9,8 @@
 </head>
 <body class="bg-gray-100 p-4">
   <div class="max-w-3xl mx-auto">
-    <h1 class="text-3xl font-bold mb-4">Generador de Paràgrafs amb Edició</h1>
+    <h1 class="text-3xl font-bold mb-2">Generador de Paràgrafs amb Edició</h1>
+    <h3 class="font-bold mb-4">Divideix un text en diferents trossos o paràgraf. </h3>
     
     <!-- Input per configurar la llargada màxima -->
     <div class="mb-4">
@@ -17,10 +18,26 @@
       <input id="maxLength" type="number" value="240" min="1" class="border p-2 w-full">
     </div>
     
+    <div class="flex items-center space-x-2 mt-2">
+    
+      <!-- Checkbox per afegir els tres punts al principi i al final -->
+      <div class="me-4 mb-4 flex items-center">
+        <input type="checkbox" id="ellipsisCheckbox" class="mr-2" checked>
+        <label for="ellipsisCheckbox" class="font-semibold">Afegir tres punts al principi i al final</label>
+      </div>
+      
+      <!-- Checkbox per mostrar total de paràgrafs en el número -->
+      <div class="ms-4 mb-4 flex items-center">
+        <input type="checkbox" id="totalParagraphsCheckbox" class="mr-2">
+        <label for="totalParagraphsCheckbox" class="font-semibold">Mostrar total de paràgrafs en el número</label>
+      </div>
+
+    </div>
+
     <!-- Textbox principal per introduir el text -->
     <div class="mb-4">
       <label for="textInput" class="block mb-1 font-semibold">Introdueix el text:</label>
-      <textarea id="textInput" rows="5" class="border p-2 w-full" placeholder="Escriu el teu text aquí..."></textarea>
+      <textarea id="textInput" rows="15" class="border p-2 w-full" placeholder="Escriu el teu text aquí..."></textarea>
     </div>
     
     <!-- Comptador de caràcters del textbox principal -->
@@ -28,17 +45,7 @@
       <span id="textboxCharCount" class="text-gray-700">0 caràcters</span>
     </div>
     
-    <!-- Checkbox per afegir els tres punts al principi i al final -->
-    <div class="mb-4 flex items-center">
-      <input type="checkbox" id="ellipsisCheckbox" class="mr-2" checked>
-      <label for="ellipsisCheckbox" class="font-semibold">Afegir tres punts al principi i al final</label>
-    </div>
-    
-    <!-- Checkbox per mostrar total de paràgrafs en el número -->
-    <div class="mb-4 flex items-center">
-      <input type="checkbox" id="totalParagraphsCheckbox" class="mr-2">
-      <label for="totalParagraphsCheckbox" class="font-semibold">Mostrar total de paràgrafs en el número</label>
-    </div>
+
     
     <!-- Contenidor on es mostraran els paràgrafs generats -->
     <div id="paragraphsContainer"></div>
@@ -115,10 +122,10 @@
       const container = document.getElementById('paragraphsContainer');
       const textboxCharCount = document.getElementById('textboxCharCount');
       
-      const text = textInput.value;
-      const maxLength = parseInt(maxLengthInput.value, 10) || 240;
-      const ellipsisEnabled = ellipsisCheckbox.checked;
       const showTotalParagraphs = totalParagraphsCheckbox.checked;
+      const text = textInput.value;
+      const maxLength = (parseInt(maxLengthInput.value, 10) || 240) - (showTotalParagraphs ? 6 : 4);
+      const ellipsisEnabled = ellipsisCheckbox.checked;
       
       // Actualitzar el comptador del textbox principal
       textboxCharCount.textContent = `${text.length} caràcters`;
@@ -144,6 +151,7 @@
         } else {
           numbering = `${index + 1}.`;
         }
+        let showTotalParagraphsLength = numbering.length
         paraNumber.textContent = numbering;
         paraNumber.className = "font-bold mb-2";
         paraDiv.appendChild(paraNumber);
